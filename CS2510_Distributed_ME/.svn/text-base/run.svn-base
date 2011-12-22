@@ -1,0 +1,12 @@
+#!/bin/bash
+
+
+if [ "$1" = "global" ]; then
+    ./make build
+    java cs2510/project2/global/GlobalDriver
+elif [ "$1" = "local" ] && [ -n "$2" ]; then
+    ./make build
+    java cs2510/project2/local/LocalDriver "$2" 50 20
+else
+    echo "usage: ./run {global|local [global nameserver]}"
+fi

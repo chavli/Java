@@ -1,0 +1,131 @@
+package cs2510.project2.local;
+
+import cs2510.project2.system.Message;
+import cs2510.project2.system.Message.MessageType;
+import cs2510.project2.system.NameServer.AddressLookup;
+import cs2510.project2.system.RaymondNode;
+
+public class UserNode extends Node implements Runnable {
+    private AddressLookup sender;
+    private RaymondNode rnode;      //holds info related to raymond's token algorithm
+    private boolean alive = true;
+    
+    public UserNode(String uid, AddressLookup sender) {
+        super();
+        this.uid = uid;
+        this.type = USER_TYPE;
+        this.sender = sender;
+        this.rnode = null;
+    }
+    
+    @Override
+    public String toString() {
+        return "User: " + this.uid;
+    }
+    
+    public void stop(){
+        alive = false;
+    }
+     
+    public void run() {
+        // Nodes simply loop over their queue waiting for messages from it
+        // They may also intiate requests for resources or send messages
+        // to other nodes
+        Message to_read, to_send;
+        String data, dest_uid;
+        String[] tokens;
+
+        // Sleep for 10 seconds, then send request to a node
+        try {
+            Thread.sleep(10000);
+        } catch (Exception e) {}
+        
+        requestToken();
+
+        /*
+        //nice
+        to_send = new Message("All your node are belong to us", "none", MessageType.SYS_ALLNODE);
+        sender.sendMessage(to_send, this.uid, "global");
+        */
+
+        while (alive) {
+            if ((to_read = peekAndRemove()) != null) {
+                processMessage(to_read);
+            }
+            else {
+                // Do some work or something
+            }
+        }
+    }
+
+    public void processMessage(Message msg) {
+        Message reply;
+        MessageType type;
+        String dest_uid, data, body;
+        String[] tokens;
+
+        type = msg.getType();
+        local_uid = msg.getSourceUid();
+        body = msg.getBody();
+        response = msg.getResponse();
+
+        switch (type) {
+            case NODE_ALLNODE_R:
+                // For now, find some node in the list that's not you and send it a message
+                reply = new Message("Test communication", "none", MessageType.NODE_TEST);
+
+                tokens = response.split("#");
+                for (String id : tokens) {
+                    if ((!id.equals(this.uid)) && (id.charAt(id.length() - 2) == 'U')) {
+                        System.out.println("Sending from " + this.uid + " to " + id);
+                        sender.sendMessage(reply, this.uid, id);
+                        break;
+                    }
+                }
+                break;
+            case NODE_TEST:
+                // Cool, got the test message
+                try {
+                    Thread.sleep(5000);
+                } catch (Exception e) {}
+
+                new_msg = new Message("Test Communication", "Response", MessageType.NODE_TEST);
+                sender.sendMessage(new_msg, this.uid, local_uid);
+                break;
+            case TREE_ACK:
+                //body contains the uid of the resource this usernode has been
+                //given exclusive access to
+                body = msg.getBody();
+                System.out.println(this.uid + " given access to " + body);
+                
+                //write data to the resource
+                reply = new Message( this.uid + " entering CS", "", MessageType.FILE_WR);
+                sender.sendMessage(reply, this.uid, body);
+                
+                // Sleep for 5 seconds, then finish using resource
+                try {
+                    Thread.sleep(5000);
+                } catch (Exception e) {}
+                
+                //write final data to resource
+                reply = new Message( this.uid + " leaving CS", "", MessageType.FILE_WR);
+                sender.sendMessage(reply, this.uid, body);
+                
+                //release the token
+                reply = new Message( body, "", MessageType.TREE_REL);
+                sender.sendMessage(reply, this.uid, "global");
+            default:
+                break;
+        }
+    }
+    
+    //some things the usernode is allowed to do
+    private void requestToken(){
+        Message request = new Message("token request", "", MessageType.TREE_REQ);
+        System.out.println(this.uid + " is requesting a token.");
+        sender.sendMessage(request, this.uid, "global");
+    }
+
+    //setters and getters
+    public void setRaymondNode(RaymondNode node){ this.rnode = node; }
+}

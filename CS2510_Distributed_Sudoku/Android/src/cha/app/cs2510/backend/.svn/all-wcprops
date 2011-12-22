@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svn/distributed-sudoku/!svn/ver/29/trunk/android/src/cha/app/cs2510/backend
+END
+SenderSocket.java
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/svn/distributed-sudoku/!svn/ver/29/trunk/android/src/cha/app/cs2510/backend/SenderSocket.java
+END
+SectorSolver.java
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/svn/distributed-sudoku/!svn/ver/29/trunk/android/src/cha/app/cs2510/backend/SectorSolver.java
+END
+Utilities.java
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/svn/distributed-sudoku/!svn/ver/21/trunk/android/src/cha/app/cs2510/backend/Utilities.java
+END
+ReceiverSocket.java
+K 25
+svn:wc:ra_dav:version-url
+V 96
+/svn/distributed-sudoku/!svn/ver/29/trunk/android/src/cha/app/cs2510/backend/ReceiverSocket.java
+END

@@ -1,0 +1,44 @@
+package cs2510.project2.system;
+
+import java.util.LinkedList;
+
+public class Token{
+    
+    //uid of the resouce this token protects
+    private String resource_uid;
+    
+    //if this token is being used to access the resource
+    private boolean locked;
+    
+    //list of usernode uids waiting for tihs token
+    private LinkedList<String> pending;
+
+    public Token(String uid){
+        resource_uid = uid;
+        locked = false;
+        pending = new LinkedList<String>();
+    }
+    
+    //lock or unlock the token
+    public void lock(){ locked = true; }
+    public void unlock(){ locked = false; }
+    
+    public String toString(){
+        String str = "{ "+ resource_uid + " : " + locked +" } waiting: [";
+        for(String uid : pending)
+            str += uid + ", ";
+        str += "]";
+        return str;
+    }
+
+    //setters and getters
+    public void addPending(String uuid) { pending.add(uuid); }
+    public void setResourceUid(String ruid){ resource_uid = ruid; }
+
+    public boolean isLocked(){ return locked; }
+    public String getPending(){ return pending.poll(); }
+    public int getNumPending(){ return pending.size(); }
+    public String getResourceUid(){ return resource_uid; }
+}
+
+

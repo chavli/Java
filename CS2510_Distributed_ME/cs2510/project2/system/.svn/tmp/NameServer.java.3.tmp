@@ -1,0 +1,196 @@
+package cs2510.project2.system;
+
+import java.util.ArrayList;
+import java.net.InetAddress;
+import cs2510.project2.local.*;
+import cs2510.project2.system.Message.MessageType;
+
+public abstract class NameServer {
+    private LookUpTable<String, Node> lookup_table;
+    private LookUpTable<String, String> global_cache;	//NOTE: the global nameserver uses this as the lookup table
+    
+    protected ReceiverSocket receiver;
+    protected SenderSocket sender;
+    protected AddressLookup lookup;
+    protected String address;
+    protected String uid;
+    protected String global_ns;
+    
+    // Pass instance of this class to each node that is created
+    public class AddressLookup {
+
+        public AddressLookup() {}
+        //this method will handle looking up the location of dest_uid
+        //1) check local nameserver
+        //2) check global cache
+        //3) ask global nameserver for info
+        public synchronized void sendMessage(Message msg, String source_uid, String dest_uid) {
+            String addr;
+            Node rcvr;
+            Message request;
+
+            // Set the uid fields
+            msg.setSourceUid(source_uid);
+            msg.setDestUid(dest_uid);
+
+            // Can send directly to global name-server with dest_uid of "global"
+            if (dest_uid.equals("global")) {
+                sender.sendMessage(msg, global_ns);
+                return;
+            }
+
+            // Look in lookup_table
+            rcvr = readTable(dest_uid);
+            if (rcvr != null) {
+                msg.setSourceAddr(address);
+                msg.setDestAddr(address);
+                rcvr.enqueueMessage(msg);
+                return;
+            }
+            System.out.println("Couldn't find in lookup table");
+
+            // Look in cache for external address
+            addr = readCache(dest_uid);
+            if (addr != null) {
+                sender.sendMessage(msg, addr);
+                return;
+            }
+            System.out.println("Couldn't find in cache");
+
+            // Need to go to global n-s
+            request = new Message(msg);
+            request.setBody(msg.getBody() + "#" + msg.getType());
+            request.setType(MessageType.SYS_LOOKUP);
+            sender.sendMessage(request, global_ns);
+        }
+    }
+
+    
+    //default constructor
+    public NameServer() {
+        lookup_table = new LookUpTable<String, Node>("local");
+        global_cache = new LookUpTable<String, String>("global");
+        uid = this.toString();  //this is used to give unique ids to users and resources
+
+        try {
+            address = new String(InetAddress.getLocalHost().getHostName());
+        } catch (Exception e) {}
+
+        receiver = new ReceiverSocket();
+        sender = new SenderSocket(address);
+        lookup = new AddressLookup();
+    }
+    
+    //nameservers:  initial machines to establish a connection with
+    public NameServer(ArrayList<String> nameservers) {
+        lookup_table = new LookUpTable<String, Node>("local");
+        global_cache = new LookUpTable<String, String>("global");
+        uid = this.toString();  //this is used to give unique ids to users and resources
+        
+        try {
+            address = new String(InetAddress.getLocalHost().getHostName());
+        } catch (Exception e) {}
+
+        receiver = new ReceiverSocket();
+        sender = new SenderSocket(address, nameservers);
+        lookup = new AddressLookup();    
+    }
+    
+    public void start() {
+        new Thread(receiver).start();
+    }
+    
+    //stop incoming and outgoing connections
+    //end all nodes
+    public void stop(){
+        receiver.stop();
+        sender.stop();
+        
+        for(Node n : lookup_table.values())
+            n.stop();
+    }
+    
+    protected void addToTable(String uid, Node node) {
+        synchronized (lookup_table) {
+            lookup_table.put(uid, node);
+        }
+    }
+
+    protected void removeFromTable(String uid) {
+        synchronized (lookup_table) {
+            lookup_table.remove(uid);
+        }
+    } 
+
+    protected Node readTable(String uid) {
+        Node node;
+        synchronized (lookup_table) {
+            node = lookup_table.get(uid);
+        }
+        return node;
+    }
+
+    protected void addToCache(String uid, String machine) {
+        synchronized (global_cache) {
+            global_cache.put(uid, machine);
+        }
+    }
+
+    protected void removeFromCache(String uid) {
+        synchronized (global_cache) {
+            global_cache.remove(uid);
+        }
+    } 
+
+    protected String readCache(String uid) {
+        String machine;
+        synchronized (global_cache) {
+            machine = global_cache.get(uid);
+        }
+        return machine;
+    } 
+
+    protected String getNodeUids() {
+        String result = "";
+        synchronized (global_cache) {
+            for (String uid : global_cache.keySet()) {
+                result += (uid + "#");
+            }
+        }
+        return result;
+    }
+
+    protected String getUserNodeUids() {
+        String result = "";
+        synchronized (global_cache) {
+            for (String uid : global_cache.keySet()) {
+                if (uid.charAt(uid.length() - 2) == 'U')
+                    result += (uid + "#");
+            }
+        }
+        return result;
+    }
+
+    protected String getResourceNodeUids() {
+        String result = "";
+        synchronized (global_cache) {
+            for (String uid : global_cache.keySet()) {
+                if (uid.charAt(uid.length() - 2) == 'R')
+                    result += (uid + "#");
+            }
+        }
+        return result;
+    }
+
+    //methods used by the CLI
+    public void dumpTables(){
+        synchronized(lookup_table){
+            System.out.println(lookup_table.toString());
+        }
+        synchronized(global_cache){
+            System.out.println(global_cache.toString());
+        }
+    }
+    
+    public abstract void dumpTree();
+}

@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 39
+/svn/mutual-exclusion/!svn/ver/61/trunk
+END
+.classpath
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/mutual-exclusion/!svn/ver/9/trunk/.classpath
+END
+.project
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/svn/mutual-exclusion/!svn/ver/9/trunk/.project
+END
+run
+K 25
+svn:wc:ra_dav:version-url
+V 43
+/svn/mutual-exclusion/!svn/ver/55/trunk/run
+END
+make
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/svn/mutual-exclusion/!svn/ver/24/trunk/make
+END

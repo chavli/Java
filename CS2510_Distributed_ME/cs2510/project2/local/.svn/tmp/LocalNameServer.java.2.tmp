@@ -1,0 +1,182 @@
+package cs2510.project2.local;
+
+import cs2510.project2.system.*;
+import cs2510.project2.system.Message.MessageType;
+
+public class LocalNameServer extends NameServer {
+    //the branch factor for the raymond tree
+    private static final int BRANCHES = 2;
+
+    //used for raymond's token-based tree ME algorithm
+    private RaymondTree<UserNode> tree;
+    
+    private LocalMessageProcessor lmp = null;
+
+    // The constructor starts the receiver thread.  The sender can be started with a call
+    // to connect() on the LocalNameServer object.
+    public LocalNameServer(int num_users, int num_resources, String global_ns) {
+        super();
+        Node node;
+        String node_uid;
+        Message msg;
+        
+    	System.out.println("Local NameServer Location: " + this.address);
+        this.global_ns = global_ns;
+        
+        //start message listener and processor
+        start();
+        
+        //add global nameserver connection
+        sender.addConnection(this.global_ns);
+
+        //notify the global server this local server joined the system
+        msg = new Message(this.address, MessageType.SYS_NEW);
+        sender.sendMessage(msg, global_ns);
+        
+        //create the Raymond Tree
+        tree = new RaymondTree<UserNode>(BRANCHES);
+
+        //create specified number of user nodes and tell global ns
+        for(int i = 0; i < num_users; ++i){
+            //create the name and the node for the user
+            node_uid = new String(this.toString() + "_U" + i);   
+            node = new UserNode(node_uid, lookup);
+            new Thread(node).start();
+               
+            //add new node to lookup table and node list
+            addToTable(node_uid, node);
+            
+            //add the new UserNode to the raymond tree
+            tree.addNode(new RaymondNode<UserNode>(node, node_uid));
+            
+            //tell the global ns a new user has joined
+            msg = new Message(node_uid, MessageType.SYS_JOIN);
+            sender.sendMessage(msg, this.global_ns);
+        }
+
+        //create specified number of resource nodes and tell global ns
+        for(int i = 0; i < num_resources; ++i){
+            //create the name and node for the resource
+            node_uid = new String(this.toString() + "_R" + i);   
+            node = new ResourceNode(node_uid);
+            new Thread(node).start();
+           
+            //add resource node to lookup table and node list
+            addToTable(node_uid, node);
+            
+            //NOTE: resource node are not added to the raymond tree
+            
+            //tell the global ns a new resource is available
+            msg = new Message(node_uid, MessageType.SYS_JOIN);
+            sender.sendMessage(msg, this.global_ns);
+        }
+    }
+
+    // Starts the message listener and the message processor
+    public void start(){
+    	//start the message listener
+    	super.start();
+    	
+    	lmp = new LocalMessageProcessor();
+    	
+        //start the message processor
+        new Thread(lmp).start();    
+    }
+    
+    @Override
+    public void dumpTree() {
+       System.out.println(tree.toString());
+    }
+    
+    //stop the message processor and all nodes
+    public void stop(){
+        //TODO: tell global nameserver this is going down
+        super.stop();
+        if(lmp != null)
+            lmp.stop();
+    }
+    
+    // Processes messages queued in the receiver socket's inbox
+    private class LocalMessageProcessor implements Runnable{
+        private boolean processing = true;
+        public LocalMessageProcessor() {}
+        
+        public void stop(){
+            processing = false;
+        }
+        
+		public void run() {
+    	    Message current, msg;
+    	    MessageType type;
+    	    String data, local_address, uid, addr;
+    	    String tokens[];
+    	    Node rcvr;
+  
+    	    while(processing){
+    	        if(receiver != null){
+    	            current = receiver.getMessage();
+    	            if(current != null){
+    	                System.out.println("Local NameServer received a message");
+    	                System.out.println(current.toString());
+    	                type = current.getType();
+          			
+    	                //process message based on type
+    	                switch(type){
+    	                    case SYS_NEW:
+    	                        //data is connection request from a local n-s
+                                local_address = current.getSourceAddr();
+                                sender.addConnection(local_address);
+                                break;
+    	                    case SYS_NEW_R:
+    	                        break;
+                            case SYS_NEW_INFORM:
+                                //new name-server to connect to
+                                data = current.getBody();
+                                sender.addConnection(data);
+                                msg = new Message("Connection request", MessageType.SYS_NEW);
+                                sender.sendMessage(msg, data);   
+                                break;
+                            case SYS_LOOKUP_R:
+                                //response from lookup request
+                                data = current.getBody();
+                                uid = current.getSourceUid();
+                                addr = current.getResponse();
+                                    
+                                //add result to cache
+                                addToCache(uid, addr);
+ 
+                                //now we can re-send the the node's original message to the appropriate destination
+                                //body is of the form <original message body>#<original message type>
+                                tokens = current.getBody().split("#");
+                                msg = new Message(tokens[0], MessageType.valueOf(tokens[1]));
+                                sender.sendMessage(msg, addr);
+                                break;
+                            case SYS_LOOKUP_NULL:
+                                //response from lookup request
+                                //notify node that the requested node doesn't exist
+                                uid = current.getSourceUid();    
+                                rcvr = readTable(uid);
+                                current.setBody("Node not found");
+                                rcvr.enqueueMessage(current);
+                                break;
+                            case SYS_ALLNODE_R:
+                                //response with all nodes in the system to be delivered to some node
+                                uid = current.getSourceUid();
+                                rcvr = readTable(uid);
+                                current.setBody("Node location found");
+
+                                System.out.println("Node uid: " + uid);
+                                rcvr.enqueueMessage(current); 
+                                break;
+                            case NO_TYPE:
+                                break;
+                            default:
+                                // Pass to destination node
+                                break;
+    	                }
+    	            }
+    	        }
+    	    }//end of loop
+		}
+    }
+}

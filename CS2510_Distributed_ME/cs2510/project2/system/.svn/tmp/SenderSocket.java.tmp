@@ -1,0 +1,92 @@
+package cs2510.project2.system;
+
+import java.io.ObjectOutputStream;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.LinkedList;
+
+// Creates connection requests and loops over outbox queue,
+// waiting to send messages to corresponding servers
+public class SenderSocket {
+    private static final int PORT = 8000;
+    
+    private ArrayList<String> machines;
+    private LinkedList<Message> outbox;
+    private String address;
+
+    public SenderSocket(String address) {
+    	this.machines = new ArrayList<String>();
+        this.outbox = new LinkedList<Message>();
+        this.address = address;
+    }
+    
+    //machines is a list of ip address of domains
+    //ex: 79.123.51.34, oxygen.cs.pitt.edu 
+    public SenderSocket(String address, ArrayList<String> machines) {
+        this.machines = machines; 
+        this.outbox = new LinkedList<Message>();
+        this.address = address;
+        
+        //start connections for each given machine
+        for(String addr : this.machines)
+        	connect(addr);
+     }
+    
+    //add a new connection and start it
+    public void addConnection(String address){
+    	connect(address);
+    }
+    
+    
+    public void connect(String address) {
+        // Create a connection with a server
+        InetAddress machine_name = null;
+        int i;
+
+        try {
+        	//start a connection with the machine at address
+	        machine_name = InetAddress.getByName(address);
+	        new Thread(new Sender(new Socket(machine_name, PORT), address)).start();
+
+        } catch (Exception e) { System.err.println(e); }
+    }
+    
+    public synchronized void sendMessage(Message msg, String dest_addr){
+        msg.setSourceAddr(this.address);
+        msg.setDestAddr(dest_addr);
+        outbox.add(msg);
+    }
+    
+    private class Sender implements Runnable {
+        // A listener is created for each connection request that the server receives
+        private Socket server_socket;
+        private String destination_machine;
+        
+        public Sender(Socket server_socket, String destination_machine) {
+            this.server_socket = server_socket;
+            this.destination_machine = destination_machine;
+        }   
+        
+        public void run() {
+            Message msg = null;
+            ObjectOutputStream out = null;
+            System.out.println("Connection achieved at " + destination_machine);
+
+            try {
+                out = new ObjectOutputStream(server_socket.getOutputStream());
+
+                while (true) {
+                    synchronized (outbox) {
+                        msg = outbox.peek();
+                        if (msg != null && msg.getDestAddr().equals(destination_machine)) {
+                            outbox.remove();
+                            out.writeObject(msg); // Sends message to the server
+                        }
+                    }
+                    Thread.sleep(500);
+                }
+            } catch (Exception e) {}
+        }
+    }
+}

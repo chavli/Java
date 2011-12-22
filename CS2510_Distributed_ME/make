@@ -1,0 +1,23 @@
+#!/bin/bash 
+
+if [ "$1" = "build" ]; then
+    echo "Compiling Global..."
+    javac cs2510/project2/global/*.java
+    echo "Compiling Local..."
+    javac cs2510/project2/local/*.java
+    echo "Compiling System..."
+    javac cs2510/project2/system/*.java
+
+elif [ "$1" = "clean" ]; then
+    echo "Cleaning Global..."
+    rm cs2510/project2/global/*.class
+    echo "Cleaning Local..."
+    rm cs2510/project2/local/*.class
+    echo "Cleaning System..."
+    rm cs2510/project2/system/*.class
+    echo "Removing resource files..."
+    rm *.cha
+
+else
+    echo "usage: ./make {build|clean}"
+fi

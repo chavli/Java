@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/distributed-sudoku/!svn/ver/30/trunk/server/src/cs2510/project3/common
+END
+Sector.java
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/distributed-sudoku/!svn/ver/22/trunk/server/src/cs2510/project3/common/Sector.java
+END
+Square.java
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/distributed-sudoku/!svn/ver/19/trunk/server/src/cs2510/project3/common/Square.java
+END
+LookUpTable.java
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/distributed-sudoku/!svn/ver/18/trunk/server/src/cs2510/project3/common/LookUpTable.java
+END
+Board.java
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/distributed-sudoku/!svn/ver/30/trunk/server/src/cs2510/project3/common/Board.java
+END
+SystemMessage.java
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/svn/distributed-sudoku/!svn/ver/26/trunk/server/src/cs2510/project3/common/SystemMessage.java
+END

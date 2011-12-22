@@ -1,0 +1,135 @@
+package cs2510.project2.local;
+
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
+import cs2510.project2.system.*;
+import cs2510.project2.system.Message.MessageType;
+import cs2510.project2.system.Message;
+
+public class LocalNameServer extends NameServer {
+    private String global_ns;
+
+    // The constructor starts the receiver thread.  The sender can be started with a call
+    // to connect() on the LocalNameServer object.
+    public LocalNameServer(int num_users, int num_resources, String global_ns) {
+        super();
+        String new_uid;
+        
+    	System.out.println("Local NameServer Location: " + this.address);
+        this.global_ns = global_ns;
+        
+        //start message listener and processor
+        start();
+        
+        //add global nameserver connection
+        sender.addConnection(this.global_ns);
+        
+        //notify the global server this local server joined the system
+        msg = new Message(this.address, MessageType.SYS_NEW);
+        sender.sendMessage(msg, global_ns);
+
+            //create specified number of user nodes and tell global ns
+            String node_uid = "";
+            UserNode unode;
+            for(int i = 0; i < num_users; ++i){
+                msg = new Message(this.address, this.global_ns, "");
+                //create the name and the node for the user
+                node_uid = new String(this.uid + "_U" + i);   
+                unode = new UserNode(node_uid, null);
+                    
+                //add new node to lookup table
+                addToTable(node_uid, unode);       
+            msg = new Message(node_uid, MessageType.SYS_JOIN);
+            sender.sendMessage(msg, this.global_ns);
+        }
+
+            //create specified number of resource nodes and tell global ns
+            ResourceNode rnode;
+            for(int i = 0; i < num_users; ++i){
+                msg = new Message(this.address, this.global_ns, "");
+                //create the name and node for the resource
+                node_uid = new String(this.uid + "_R" + i);   
+                rnode = new ResourceNode(node_uid);
+                
+                //add resource node to lookup table
+                addToTable(node_uid, rnode);
+
+                //set other fields in the header and send message
+            msg = new Message(node_uid, MessageType.SYS_JOIN);
+            sender.sendMessage(msg, this.global_ns);
+            }
+
+
+    	} catch(UnknownHostException ex) {
+    	      ex.printStackTrace();
+    	  }    
+    }
+
+    // Starts the message listener and the message processor
+    public void start(){
+    	//start the message listener
+    	super.start();
+    	
+        //start the message processor
+        new Thread(new LocalMessageProcessor()).start();    
+    }
+    
+    public void stop(){
+    
+    }
+    // Processes messages queued in the receiver socket's inbox
+    private class LocalMessageProcessor implements Runnable{
+        public LocalMessageProcessor() {}
+
+		public void run() {
+    	    Message current, msg;
+    	    MessageType type;
+		    String data, local_address;
+
+			while(true){
+				if(receiver != null){
+					current = receiver.getMessage();
+					if(current != null){
+						System.out.println("Local NameServer received a message");
+						System.out.println(current.toString());
+						type = current.getType();
+						
+						//process message based on type
+						switch(type){
+                            case SYS_NEW:
+                                //data is connection request from a local n-s
+                                local_address = current.getSourceAddr();
+                                sender.addConnection(local_address);
+
+                                break;
+							case SYS_NEW_R:
+								//data is just a welcome message
+								data = current.getBody();
+								System.out.println(data);
+								
+								//since this is coming from global nameserver, add entry to cache
+								addToCache(current.getSourceUid(), current.getSourceAddr());
+							    break;
+                            case SYS_NEW_INFORM:
+                                //new name-server to connect to
+                                data = current.getBody();
+                                sender.addConnection(data);
+                                
+                                msg = new Message("Connection request", MessageType.SYS_NEW);
+                                sender.sendMessage(msg, data);
+                                
+                                break;
+							
+							case NO_TYPE:
+
+                            default:
+                                // Pass to destination node
+							break;
+						}
+					}
+				}
+			}//end of loop
+		}
+    }
+}

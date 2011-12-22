@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/distributed-sudoku/!svn/ver/29/trunk/android
+END
+.classpath
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/distributed-sudoku/!svn/ver/20/trunk/android/.classpath
+END
+proguard.cfg
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/distributed-sudoku/!svn/ver/9/trunk/android/proguard.cfg
+END
+project.properties
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/distributed-sudoku/!svn/ver/29/trunk/android/project.properties
+END
+.project
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/distributed-sudoku/!svn/ver/9/trunk/android/.project
+END
+AndroidManifest.xml
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/distributed-sudoku/!svn/ver/29/trunk/android/AndroidManifest.xml
+END

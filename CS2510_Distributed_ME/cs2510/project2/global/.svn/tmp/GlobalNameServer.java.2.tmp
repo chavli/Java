@@ -1,0 +1,165 @@
+package cs2510.project2.global;
+
+import java.util.ArrayList;
+
+import cs2510.project2.local.Node;
+import cs2510.project2.system.Message;
+import cs2510.project2.system.NameServer;
+import cs2510.project2.system.RaymondNode;
+import cs2510.project2.system.RaymondTree;
+import cs2510.project2.system.Message.MessageType;
+
+public class GlobalNameServer extends NameServer{
+	//the global nameserver has every local nameserver as a direct child
+	private static final int BRANCHES = Integer.MAX_VALUE;
+    
+    //used for raymond's token-based tree ME algorithm
+    private RaymondTree<String> tree;
+    
+    //global message processor
+	private GlobalMessageProcessor gmp = null;
+
+    public GlobalNameServer(){
+    	super();
+	    System.out.println("Global NameServer Location: " + this.address);
+	        
+	    //create the tree used for raymond's token algorithm
+	    tree = new RaymondTree<String>(BRANCHES);
+	    
+        //add the global ns to the root of the raymond tree
+        tree.addNode(new RaymondNode<String>(this.address, "root")); 
+
+        //start message listener and processor
+	    start();
+    }
+    
+    //starts the nameservers message listener and the message processor
+    public void start(){
+    	//start the message listener
+    	super.start();
+	
+    	//create the message processor
+    	gmp = new GlobalMessageProcessor();
+    	
+        //start the message processor
+        new Thread(gmp).start();    
+    }
+    
+    //stop the global message processor
+    //call superclass to end all connections and nodes
+    public void stop(){
+        super.stop();
+        if(gmp != null)
+            gmp.stop();
+    }
+    
+    @Override
+    public void dumpTree() {
+       System.out.println(tree.toString());
+    }
+    
+    //processes messages queued in the receiver socket's inbox
+    private class GlobalMessageProcessor implements Runnable{
+        private ArrayList<String> local_machines;
+        private boolean processing = true;
+        
+        public GlobalMessageProcessor() {
+            local_machines = new ArrayList<String>();
+        }
+        
+        public void stop(){
+            processing = false;
+        }
+        
+		public void run() {
+    	    Message current, msg;
+    	    MessageType type;
+			String data, local_uid, local_address, result;
+
+			while(processing){
+				if(receiver != null){
+					current = receiver.getMessage();
+					if(current != null){
+						System.out.println("Global NameServer received a message");
+						System.out.println(current.toString());
+						type = current.getType();
+												
+						//process message based on type
+						switch(type){
+							//new local nameserver joins system
+							case SYS_NEW:	
+								local_uid = current.getSourceUid();
+								local_address = current.getSourceAddr();
+
+								//create a connection with the new machine
+								sender.addConnection(local_address);
+								
+								//create a response message (message, type)
+								msg = new Message(current);
+                                msg.setType(MessageType.SYS_NEW_R);
+                                msg.setResponse("Welcome to the system");
+							    
+								//send a response to the new local ns
+								sender.sendMessage(msg, local_address);
+
+                                //need to inform all local name-servers of new joiner
+                                for (String machine : this.local_machines) {
+                                    msg = new Message(local_address, MessageType.SYS_NEW_INFORM);
+                                    sender.sendMessage(msg, machine);
+                                }
+
+                                this.local_machines.add(local_address);
+
+                                //add uid of new local nameserver to raymond tree
+                                tree.addNode(new RaymondNode<String>(local_address, local_address));
+
+								break;
+                            
+                            //a new node (user or resource) has joined the system
+						    case SYS_JOIN:
+                                //the body contains the uid of the new node
+                                data = current.getBody();
+                                local_address = current.getSourceAddr();
+
+                                addToCache(data, local_address);
+                                break;
+							//local nameserver is asking for the location of a resource
+							case SYS_LOOKUP:
+								//data is just the uid of the resource to lookup
+								data = current.getDestUid();
+                                local_address = current.getSourceAddr();
+                                result = readCache(data);
+
+                                if (result == null) {
+    								msg = new Message(current);
+                                    msg.setType(MessageType.SYS_LOOKUP_NULL);
+                                    msg.setResponse("null");
+                                }
+                                else {
+    								msg = new Message(current);
+                                    msg.setType(MessageType.SYS_LOOKUP_R);
+    								msg.setResponse(result);
+                                    System.out.println("global couldn't find it either");
+                                }
+
+                                //send a response to the local ns
+                                sender.sendMessage(msg, local_address);
+							    break;
+                            case SYS_ALLNODE:
+                                //send ALL the nodes
+                                local_address = current.getSourceAddr();
+                                msg = new Message(current);
+                                msg.setType(MessageType.SYS_ALLNODE_R);
+                                msg.setResponse(getNodeUids());
+                                sender.sendMessage(msg, local_address);
+                                break;
+							case NO_TYPE:
+							    break;
+						}
+					}
+				}
+			}
+		}
+    }
+}
+//this is a lot of closing brackets

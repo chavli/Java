@@ -1,0 +1,191 @@
+package cs2510.project2.local;
+
+import cs2510.project2.system.*;
+import cs2510.project2.system.Message.MessageType;
+
+
+public class LocalNameServer extends NameServer {
+    //the branch factor for the raymond tree
+    private static final int BRANCHES = 2;
+
+    //used for raymond's token-based tree ME algorithm
+    private RaymondTree tree;
+    
+    private LocalMessageProcessor lmp = null;
+
+    // The constructor starts the receiver thread.  The sender can be started with a call
+    // to connect() on the LocalNameServer object.
+    public LocalNameServer(int num_users, int num_resources, String global_ns) {
+        super();
+        String node_uid;
+        Message msg;
+        
+    	System.out.println("Local NameServer Location: " + this.address);
+        this.global_ns = global_ns;
+        
+        //start message listener and processor
+        start();
+
+        //add global nameserver connection
+        sender.addConnection(this.global_ns);
+
+        //notify the global server this local server joined the system
+        msg = new Message(this.address, "none", MessageType.SYS_NEW);
+        sender.sendMessage(msg, global_ns);
+        
+        //create the Raymond Tree
+        tree = new RaymondTree(BRANCHES);
+
+        //create specified number of user nodes and tell global ns
+        UserNode unode;
+        for(int i = 0; i < num_users; ++i){
+            //create the name and the node for the user
+            node_uid = new String(this.uid + "_U" + i);   
+            unode = new UserNode(node_uid, lookup);
+            new Thread(unode).start();
+               
+            //add new node to lookup table and node list
+            addToTable(node_uid, unode);
+            
+            //add the new UserNode to the raymond tree
+            RaymondNode rays = new RaymondNode(node_uid);
+            tree.addNode(rays);
+
+            //NOTE: I put the raymond node inside the usernode so when dealing with
+            //raymond messages, the usernode has access to all of its raymond data.
+            //having the usernode inside the raymond node would mean the usernode
+            //would have no way of accessing raymond data.
+            unode.setRaymondNode(rays);
+            
+            //tell the global ns a new user has joined
+            msg = new Message(node_uid, "none", MessageType.SYS_JOIN);
+            sender.sendMessage(msg, this.global_ns);
+        }
+
+        //create specified number of resource nodes and tell global ns
+        ResourceNode rnode;
+        for(int i = 0; i < num_resources; ++i){
+            //create the name and node for the resource
+            node_uid = new String(this.uid + "_R" + i);   
+            rnode = new ResourceNode(node_uid, lookup);
+            new Thread(rnode).start();
+           
+            //add resource node to lookup table and node list
+            addToTable(node_uid, rnode);
+            
+            //NOTE: resource node are not added to the raymond tree
+            
+            //tell the global ns a new resource is available
+            msg = new Message(node_uid, "none", MessageType.SYS_JOIN);
+            sender.sendMessage(msg, this.global_ns);
+        }
+    }
+
+    // Starts the message listener and the message processor
+    public void start(){
+    	//start the message listener
+    	super.start();
+    	
+    	lmp = new LocalMessageProcessor();
+    	
+        //start the message processor
+        new Thread(lmp).start();    
+    }
+    
+    @Override
+    public void dumpTree() {
+       System.out.println(tree.toString());
+    }
+    
+    //stop the message processor and all nodes
+    public void stop(){
+        //TODO: tell global nameserver this is going down
+        super.stop();
+        if(lmp != null)
+            lmp.stop();
+    }
+    
+    // Processes messages queued in the receiver socket's inbox
+    private class LocalMessageProcessor implements Runnable{
+        private boolean processing = true;
+        public LocalMessageProcessor() {}
+        
+        public void stop(){
+            processing = false;
+        }
+        
+		public void run() {
+    	    Message current, msg;
+    	    MessageType type;
+    	    String body, response, local_address, local_uid, dest_uid, uid;
+    	    String tokens[];
+    	    Node rcvr;
+  
+    	    while(processing){
+    	        if(receiver != null){
+    	            current = receiver.getMessage();
+    	            if(current != null){
+    	                System.out.println("Local NameServer received a message");
+    	                System.out.println(current.toString() + '\n');
+
+                        body = current.getBody();
+                        response = current.getResponse();
+                        local_uid = current.getSourceUid();
+                        dest_uid = current.getDestUid();
+                        local_address = current.getSourceAddr();
+    	                type = current.getType();
+          			
+    	                //process message based on type
+    	                switch(type){
+    	                    case SYS_NEW:
+    	                        //data is connection request from a local n-s
+                                sender.addConnection(local_address);
+                                break;
+    	                    case SYS_NEW_R:
+    	                        break;
+                            case SYS_NEW_INFORM:
+                                //new name-server to connect to
+                                sender.addConnection(body);
+                                msg = new Message("Connection request", "none", MessageType.SYS_NEW);
+                                sender.sendMessage(msg, body); 
+                                break;
+                            case SYS_LOOKUP_R:
+                                //response from lookup request
+                                //body is of the form <requesting node>#<requested node>#<original message body>#<original message type>
+                                tokens = current.getBody().split("#");
+
+                                //add result to cache
+                                addToCache(tokens[1], response);
+ 
+                                //now we can re-send the the node's original message to the appropriate destination
+                                msg = new Message(tokens[2], "none", MessageType.valueOf(tokens[3]));
+                                msg.setSourceUid(tokens[0]);
+                                msg.setDestUid(tokens[1]);
+
+                                sender.sendMessage(msg, response);
+                                break;
+                            case SYS_LOOKUP_NULL:
+                                //response from lookup request
+                                //notify node that the requested node doesn't exist
+                                tokens = current.getBody().split("#");
+                                uid = tokens[0];
+                                rcvr = readTable(uid);
+                                rcvr.enqueueMessage(current);
+                                break;
+                            case NO_TYPE:
+                                break;
+                            default:
+                                // Theoretically, all messages targeted to a specific node can be simply delivered to that node's
+                                // inbox
+                                rcvr = readTable(dest_uid);
+                                rcvr.enqueueMessage(current);
+                                rcvr = readTable(dest_uid);
+                                rcvr.enqueueMessage(current);
+                                break;
+    	                }
+    	            }
+    	        }
+    	    }//end of loop
+		}
+    }
+}

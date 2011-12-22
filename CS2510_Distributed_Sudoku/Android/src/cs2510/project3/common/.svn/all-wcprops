@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svn/distributed-sudoku/!svn/ver/25/trunk/android/src/cs2510/project3/common
+END
+Sector.java
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/svn/distributed-sudoku/!svn/ver/20/trunk/android/src/cs2510/project3/common/Sector.java
+END
+Square.java
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/svn/distributed-sudoku/!svn/ver/20/trunk/android/src/cs2510/project3/common/Square.java
+END
+LookUpTable.java
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/svn/distributed-sudoku/!svn/ver/17/trunk/android/src/cs2510/project3/common/LookUpTable.java
+END
+Board.java
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/distributed-sudoku/!svn/ver/20/trunk/android/src/cs2510/project3/common/Board.java
+END
+SystemMessage.java
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/svn/distributed-sudoku/!svn/ver/25/trunk/android/src/cs2510/project3/common/SystemMessage.java
+END

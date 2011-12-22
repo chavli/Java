@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/distributed-sudoku/!svn/ver/30/trunk/server/src/cs2510/project3/system
+END
+SenderSocket.java
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/svn/distributed-sudoku/!svn/ver/30/trunk/server/src/cs2510/project3/system/SenderSocket.java
+END
+Utilities.java
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svn/distributed-sudoku/!svn/ver/28/trunk/server/src/cs2510/project3/system/Utilities.java
+END
+ReceiverSocket.java
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/svn/distributed-sudoku/!svn/ver/30/trunk/server/src/cs2510/project3/system/ReceiverSocket.java
+END

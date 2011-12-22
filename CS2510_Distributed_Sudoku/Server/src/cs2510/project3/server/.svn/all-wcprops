@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/distributed-sudoku/!svn/ver/31/trunk/server/src/cs2510/project3/server
+END
+SudokuServer.java
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/svn/distributed-sudoku/!svn/ver/30/trunk/server/src/cs2510/project3/server/SudokuServer.java
+END
+SudokuCLI.java
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svn/distributed-sudoku/!svn/ver/30/trunk/server/src/cs2510/project3/server/SudokuCLI.java
+END
+SudokuDriver.java
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/svn/distributed-sudoku/!svn/ver/31/trunk/server/src/cs2510/project3/server/SudokuDriver.java
+END

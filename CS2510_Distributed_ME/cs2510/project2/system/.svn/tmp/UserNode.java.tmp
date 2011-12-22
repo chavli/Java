@@ -1,0 +1,408 @@
+package cs2510.project2.system;
+
+import cs2510.project2.system.Message;
+import cs2510.project2.system.Message.MessageType;
+import cs2510.project2.system.NameServer.AddressLookup;
+import cs2510.project2.system.RaymondNode;
+
+import java.util.Random;
+import java.util.ArrayList;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.Random;
+
+public class UserNode extends ObjectNode implements Runnable {
+    private static final int TREE = 1;
+    private static final int TOKENLESS = 2;
+
+    // Common for both ME types
+    private UserMessageProcessor ump;
+    private int ME_TYPE;
+    private int readThresh;
+    private int writeThresh;
+
+    // Tokenless stuff
+    private CyclicBarrier barrier;
+    private int clock;
+    private int num_users;
+    private String resource;
+    private ArrayList<String> users;
+    private ArrayList<String> queued;
+    private int cs_requested;
+    private boolean in_cs;
+   
+    //Random number generator for deciding actions
+    private Random random;
+
+    public UserNode(String uid, AddressLookup sender/*, int me, float read, float write*/) {
+        super(uid, sender);
+        this.type = ObjectType.USER; 
+        this.ME_TYPE = TOKENLESS;
+        this.readThresh = 30;
+        this.writeThresh = 60;
+        /*this.ME_TYPE = me;
+        this.readThresh = read;
+        this.writeThresh = read + write;*/
+        this.random = new Random(); 
+
+        //tokenless stuff
+        this.barrier = new CyclicBarrier(2);
+        this.clock = 0;
+        this.num_users = 0;
+        this.resource = null;
+        this.users = new ArrayList<String>();
+        this.queued = new ArrayList<String>();
+        this.cs_requested = -1;
+        this.in_cs = false;
+        
+        //start the message listener
+        start();
+    }
+    
+    @Override
+    public String toString() {
+        return "User: " + this.ouid;
+    }
+
+    // Starts the message processor
+    public void start() {
+        ump = new UserMessageProcessor(this.ouid);
+        new Thread(ump).start();
+    }
+        
+    public void stop(){
+        alive = false;
+        if( ump != null )
+            ump.stop();
+    }
+     
+    public void run() {
+        int move;
+
+        while (alive) {
+            // Sleep for 10 seconds before doing anything
+            try {
+                Thread.sleep(10000);
+            } catch (Exception e) {}
+
+<<<<<<< .mine
+        while(alive){
+            if (this.ME_TYPE == TREE) {
+                requestToken();
+            }
+            else {
+                /* Token-less run */
+                random = new Random();
+                move = random.nextInt(100);
+                if (move > writeThresh) // Do nothing
+                    try { Thread.sleep(10000); } catch (Exception ex) {}
+=======
+            move = random.nextInt(100);
+
+            /* Token-less run */
+            requestResource();
+            if (move > readThresh) { // Write
+                if (this.ME_TYPE == TREE) {
+                    requestToken();
+                }
+>>>>>>> .r47
+                else {
+                    requestUsers();
+                    requestME();
+                    writeResource();
+                    releaseResource();
+                }
+            }
+<<<<<<< .mine
+        }//end loop
+=======
+            else { // Read
+                readResource();
+            }
+        }
+>>>>>>> .r47
+    }
+
+    private class UserMessageProcessor implements Runnable {
+        private boolean processing;
+        private String uid;
+
+        public UserMessageProcessor(String uid) {
+            this.processing = true;
+            this.uid = uid;
+        }
+
+        public void stop() {
+            processing = false;
+        }
+
+        public void run() {
+            Message incoming, outgoing;
+            MessageType type;
+            String source_uid, dest_uid, body, attachment;
+            int ts, num_acks = 0;
+
+            while (processing) {
+                if ((incoming = peekAndRemove()) != null) {
+                    type = incoming.getType();
+                    source_uid = incoming.getSourceUid();
+                    body = incoming.getBody();
+                    attachment = incoming.getAttachment();
+                    ts = incoming.getTimestamp();
+                    
+                    //update logical clock
+                    if (ts >= getClock())
+                        setClock(ts + 1);
+                        
+                    switch (type) {
+                        case TOK_ACK:
+                            //body contains the uid of the resource this usernode has been
+                            //given exclusive access to
+                            System.out.println(this.uid + " given access to " + body);
+ 
+                            //write data to the resource
+                            outgoing = new Message( this.uid + " entering CS", "", MessageType.FILE_WR);
+                            sender.sendMessage(outgoing, this.uid, body);
+                            
+                            // Sleep for 5 seconds, then finish using resource
+                            try {
+                                Thread.sleep(5000);
+                            } catch (Exception e) {}
+                            
+                            //write final data to resource
+                            outgoing = new Message( this.uid + " leaving CS", "", MessageType.FILE_WR);
+                            sender.sendMessage(outgoing, this.uid, body);
+                            
+                            //release the token
+                            outgoing = new Message( source_uid, "", MessageType.TOK_REL);
+                            sender.sendMessage(outgoing, this.uid, AddressLookup.TO_GLOBAL);
+                            break;
+                        case RA_REQ:
+                            if (inCS(body)) {
+                                enqueueUser(source_uid);
+                            }
+                            else if (!wantCS(body)) {
+                                setClock(getClock() + 1);
+                                outgoing = new Message(body, "It's all yours", MessageType.RA_ACK, getClock());
+                                sender.sendMessage(outgoing, this.uid, source_uid);
+                            }
+                            else if (getCsRequested() < ts) {
+                                enqueueUser(source_uid);
+                            }
+                            else if (ts < getCsRequested()) {
+                                setClock(getClock() + 1);
+                                outgoing = new Message(body, "It's all yours", MessageType.RA_ACK, getClock());
+                                sender.sendMessage(outgoing, this.uid, source_uid);
+                            }
+                            else if (this.uid.compareTo(source_uid) < 0) {
+                                enqueueUser(source_uid);
+                            }
+                            else {
+                                setClock(getClock() + 1);
+                                outgoing = new Message(body, "It's all yours", MessageType.RA_ACK, getClock());
+                                sender.sendMessage(outgoing, this.uid, source_uid);
+                            }
+                            break;
+                        case RA_ACK:
+                            if (++num_acks == (getNumUsers() - 1)) {
+                                num_acks = 0;
+                                if (getBarrier().getNumberWaiting() == 1)
+                                    trigger();
+                            }
+                            break;
+                        case NODE_RANDRESOURCE_R:
+                            setResource(attachment);
+                            if (getBarrier().getNumberWaiting() == 1)
+                                trigger();
+                            break;
+                        case NODE_RANDRESOURCE_NULL:
+                            // Retry
+                            try { Thread.sleep(1000); } catch (Exception e) {}
+                            outgoing = new Message("", "", MessageType.SYS_RANDRESOURCE);
+                            sender.sendMessage(outgoing, this.uid, "global");
+                            break;
+                        case NODE_ALLUSER_R:
+                            setUsers(attachment);
+                            if (getBarrier().getNumberWaiting() == 1)
+                                trigger();
+                            break;
+                        case NODE_ALLUSER_NULL:
+                            // Retry
+                            try { Thread.sleep(1000); } catch (Exception e) {}
+                            outgoing = new Message("", "", MessageType.SYS_ALLUSER);
+                            sender.sendMessage(outgoing, this.uid, "global");
+                            break;
+                        case FILE_RD_R:
+                            // Dump the file contents
+                            System.out.println(this.uid + ": printing resource " + getResource() + " contents\n" + body);
+                            if (getBarrier().getNumberWaiting() == 1)
+                                trigger();
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
+    }
+    
+    //some things the usernode is allowed to do
+    /* ---token-based--- */
+    private void requestToken(){
+        Message request = new Message("token request", "", MessageType.TOK_REQ);
+        System.out.println(this.ouid + " is requesting a token.");
+        sender.sendMessage(request, this.ouid, AddressLookup.TO_GLOBAL);
+    }
+
+    /* ---token-less--- */
+    protected void trigger() {
+        try {
+            this.barrier.await();
+        } catch (InterruptedException ex) { ex.printStackTrace();
+        } catch (BrokenBarrierException ex) { ex.printStackTrace(); }
+    }
+
+    // Sends a request to the global ns for a random resource
+    private void requestResource() {
+        setClock(this.clock + 1);
+        Message msg = new Message("", "", MessageType.SYS_RANDRESOURCE, this.clock);
+        sender.sendMessage(msg, this.ouid, "global");
+
+        // Wait for response
+        trigger();
+        this.barrier.reset();
+    }
+
+    /* READ functions */
+    // Reads the resource for some time, maybe dumps its contents
+    private void readResource() {
+        setClock(getClock() + 1);
+        Message msg = new Message(this.ouid + " reading resource ", "", MessageType.FILE_RD, this.clock);
+        sender.sendMessage(msg, this.ouid, this.resource);
+
+        // Wait for response
+        trigger();
+        this.barrier.reset();
+
+        try {
+            Thread.sleep(1000 + random.nextInt(9000));
+            setClock(getClock() + 5);
+        } catch (Exception e) {}
+
+        sender.sendMessage(msg, this.ouid, this.resource);
+
+        // Wait for response
+        trigger();
+        this.barrier.reset();
+    }
+
+    /* WRITE functions */
+    // Sends a request to the global ns for all user nodes in the system
+    private void requestUsers() {
+        setClock(this.clock + 1);
+        Message msg = new Message("", "", MessageType.SYS_ALLUSER, this.clock);
+        sender.sendMessage(msg, this.ouid, "global");
+
+        // Wait for response
+        trigger();
+        this.barrier.reset();
+    }
+
+    // Sends a request for ME to every user in the system
+    private void requestME() {
+        setClock(this.clock + 1);
+        this.cs_requested = this.clock;
+        Message msg = new Message(this.resource, "", MessageType.RA_REQ, this.clock);
+    
+        for (String user : this.users) {
+            if (!this.ouid.equals(user))
+                sender.sendMessage(msg, this.ouid, user);
+        }
+
+        if (this.num_users > 1) {
+            // Wait for response
+            System.out.println("Waiting for CS");
+            trigger();
+        }
+        this.in_cs = true;
+        this.barrier.reset();
+    }
+
+    // Writes to a resource
+    private void writeResource() {
+        //write data to the resource
+        Message msg;
+
+        setClock(getClock() + 1);
+        msg = new Message(this.ouid + " entering CS", "", MessageType.FILE_WR, this.clock);
+        sender.sendMessage(msg, this.ouid, this.resource);
+        
+        // Sleep for 5 seconds, then finish using resource
+        System.out.println("Node " + this.ouid + " in CS");
+        try {
+            Thread.sleep(1000 + random.nextInt(9000));
+            setClock(getClock() + 5);
+        } catch (Exception e) {}
+        
+        //write final data to resource
+        setClock(getClock() + 1);
+        msg = new Message(this.ouid + " leaving CS", "", MessageType.FILE_WR, this.clock);
+        sender.sendMessage(msg, this.ouid, this.resource);
+    }
+
+    // Sends an ACK to all nodes that it has queued
+    private void releaseResource() {
+        System.out.println("Leaving CS");
+
+        this.in_cs = false;
+        this.cs_requested = -1;
+
+        setClock(this.clock + 1);
+        Message msg = new Message(this.resource, "It's all yours", MessageType.RA_ACK, this.clock);
+        
+        for (String user : this.queued)
+            sender.sendMessage(msg, this.ouid, user);
+
+        resetMEVars();
+    }
+
+    // Reset ME var values
+    private void resetMEVars() {
+        this.num_users = 0;
+        this.resource = null;
+        this.users.clear();
+        this.queued.clear();
+    }
+
+    protected boolean wantCS(String rUid) {
+        return ((this.cs_requested != -1) && (this.resource.equals(rUid)));
+    }
+    
+    protected boolean inCS(String rUid) {
+        return (this.in_cs && this.resource.equals(rUid));
+    }
+
+    //setters (used by message processor)
+    protected synchronized void setClock(int val) { this.clock = val; }
+    protected void incNumUsers() { this.num_users++; }
+    protected void decNumUsers() { this.num_users--; }
+    protected void setResource(String rUid) { this.resource = new String(rUid); }
+    protected void enqueueUser(String user) { this.queued.add(new String(user)); }
+    protected void setCsRequested(int val) { this.cs_requested = val; }
+    protected void setUsers(String userList) { 
+        String[] tokens = userList.split("#");
+
+        this.num_users = 0;
+        for (int i = 0; i < tokens.length; ++i) {
+            this.num_users++;
+            this.users.add(tokens[i]);
+        }
+    }
+
+    // getters
+    protected CyclicBarrier getBarrier() { return this.barrier; }
+    protected int getClock() { return this.clock; }
+    protected int getNumUsers() { return this.num_users; }
+    protected String getResource() { return this.resource; }
+    protected int getCsRequested() { return this.cs_requested; }
+}
